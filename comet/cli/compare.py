@@ -255,9 +255,6 @@ def score(cfg: Namespace, systems: List[Dict[str, List[str]]]) -> np.ndarray:
     if not cfg.disable_cache:
         model.set_embedding_cache()
 
-    if cfg.print_cache_info:
-        print(model.retrieve_sentence_embedding.cache_info())
-
     if cfg.gpus > 1:
         # Create a single list that contains all systems' src, ref & translation.
         samples = [
@@ -291,6 +288,10 @@ def score(cfg: Namespace, systems: List[Dict[str, List[str]]]) -> np.ndarray:
                 length_batching=(not cfg.disable_length_batching),
             )
             seg_scores += outputs.scores
+
+    # Report cache usage only after the cache has been used.
+    if cfg.print_cache_info:
+        print(model.retrieve_sentence_embedding.cache_info())
 
     n = len(systems[0]["src"])
     # [grouper](https://docs.python.org/3/library/itertools.html#itertools-recipes)
@@ -440,9 +441,6 @@ def compare_command() -> None:
     if not cfg.disable_cache:
         model.set_embedding_cache()
 
-    if cfg.print_cache_info:
-        print(model.retrieve_sentence_embedding.cache_info())
-
     assert len(cfg.translations) > 1, "You must provide at least 2 translation files"
 
     with open(cfg.sources(), encoding="utf-8") as fp:
@@ -461,6 +459,19 @@ def compare_command() -> None:
         ]
     else:
         systems = [{"src": sources, "mt": system} for system in translations]
+
+    # Segments are paired by line number, so a file with a different number of
+    # lines would be silently truncated and scored against the wrong sources.
+    aligned_files = list(zip(cfg.translations, translations))
+    if cfg.references is not None:
+        aligned_files.append((cfg.references, references))
+    for path_fr, lines in aligned_files:
+        if len(lines) != len(sources):
+            parser.error(
+                "{} has {} lines but the sources have {}.".format(
+                    path_fr.rel_path, len(lines), len(sources)
+                )
+            )
 
     seg_scores = score(cfg, systems)
     population_size = seg_scores.shape[1]

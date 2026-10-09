@@ -194,6 +194,19 @@ def score_command() -> None:
     else:
         data = {"src": [sources for _ in translations], "mt": translations}
 
+    # Segments are paired by line number, so a file with a different number of
+    # lines would be silently truncated and scored against the wrong sources.
+    aligned_files = list(zip(cfg.translations, translations))
+    if cfg.references is not None:
+        aligned_files.append((cfg.references, references))
+    for path_fr, lines in aligned_files:
+        if len(lines) != len(sources):
+            parser.error(
+                "{} has {} lines but the sources have {}.".format(
+                    path_fr.rel_path, len(lines), len(sources)
+                )
+            )
+
     if cfg.gpus > 1:
         # Flatten all data to score across multiple GPUs
         for k, v in data.items():

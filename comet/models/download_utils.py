@@ -102,15 +102,17 @@ def _maybe_extract(compressed_filename: str, directory: str, extension: str = No
             zip_.extractall(directory)
 
     elif "tar.gz" in extension or "tgz" in extension:
-        # `tar` is much faster than python's `tarfile` implementation
+        # `tar` is much faster than python's `tarfile` implementation.
+        # check_call raises when `tar` fails (e.g. a corrupt or truncated archive),
+        # so a failed extraction is not reported as a successful one.
         with open(os.devnull, "w") as devnull:
-            subprocess.call(
+            subprocess.check_call(
                 ["tar", "-C", directory, "-zxvf", compressed_filename], stdout=devnull
             )
 
     elif "tar" in extension:
         with open(os.devnull, "w") as devnull:
-            subprocess.call(
+            subprocess.check_call(
                 ["tar", "-C", directory, "-xvf", compressed_filename], stdout=devnull
             )
 
