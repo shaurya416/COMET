@@ -72,6 +72,7 @@ from scipy import stats
 from tabulate import tabulate
 
 from comet import download_model, load_from_checkpoint
+from comet.models import CometModel
 
 torch.set_float32_matmul_precision('high')
 
@@ -238,23 +239,19 @@ def bootstrap_resampling(
     return sys_scores
 
 
-def score(cfg: Namespace, systems: List[Dict[str, List[str]]]) -> np.ndarray:
+def score(
+    cfg: Namespace, systems: List[Dict[str, List[str]]], model: CometModel
+) -> np.ndarray:
     """Scores each systems with a given model.
 
     Args:
         cfg (Namespace): comet-compare configs.
         systems (List[Dict[str, List[str]]]): List with translations for each system.
+        model (CometModel): Loaded COMET model used to score the systems.
 
     Return:
         np.ndarray: segment-level scores flatten.
     """
-    model = load_from_checkpoint(cfg.model_path)
-    model.eval()
-    model.half()
-
-    if not cfg.disable_cache:
-        model.set_embedding_cache()
-
     if cfg.gpus > 1:
         # Create a single list that contains all systems' src, ref & translation.
         samples = [
@@ -473,7 +470,7 @@ def compare_command() -> None:
                 )
             )
 
-    seg_scores = score(cfg, systems)
+    seg_scores = score(cfg, systems, model)
     population_size = seg_scores.shape[1]
     sys_scores = bootstrap_resampling(
         seg_scores,

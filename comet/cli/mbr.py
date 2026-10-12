@@ -267,7 +267,8 @@ def mbr_command() -> None:
     
     model = load_from_checkpoint(model_path)
     model.eval()
-    model.cuda()
+    if cfg.gpus > 0:
+        model.cuda()
     model.half()
     
     if not isinstance(model, RegressionMetric):

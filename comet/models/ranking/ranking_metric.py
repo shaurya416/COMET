@@ -276,7 +276,8 @@ class RankingMetric(CometModel):
         Returns:
             List[dict]: List with input samples in the form of a dict
         """
-        df = pd.read_csv(path)
+        # Segments such as "" or "NA" are text, not missing values.
+        df = pd.read_csv(path, keep_default_na=False)
         df = df[["src", "pos", "neg", "ref"]]
         df["src"] = df["src"].astype(str)
         df["pos"] = df["pos"].astype(str)

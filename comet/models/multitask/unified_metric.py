@@ -294,7 +294,8 @@ class UnifiedMetric(CometModel):
         Returns:
             List[dict]: Returns a list of training examples.
         """
-        df = pd.read_csv(path)
+        # Segments such as "" or "NA" are text, not missing values.
+        df = pd.read_csv(path, keep_default_na=False)
         # Deep copy input segments
         columns = self.hparams.input_segments[:]
         # Make sure everything except score is str type
@@ -314,7 +315,8 @@ class UnifiedMetric(CometModel):
         Returns:
             List[dict]: Returns a list of validation examples.
         """
-        df = pd.read_csv(path)
+        # Segments such as "" or "NA" are text, not missing values.
+        df = pd.read_csv(path, keep_default_na=False)
         # Deep copy input segments
         columns = self.hparams.input_segments[:]
         # If system in columns we will use this to calculate system-level accuracy

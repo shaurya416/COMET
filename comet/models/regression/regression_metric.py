@@ -286,7 +286,8 @@ class RegressionMetric(CometModel):
         Returns:
             List[dict]: List with input samples in the form of a dict
         """
-        df = pd.read_csv(path)
+        # Segments such as "" or "NA" are text, not missing values.
+        df = pd.read_csv(path, keep_default_na=False)
         df = df[["src", "mt", "ref", "score"]]
         df["src"] = df["src"].astype(str)
         df["mt"] = df["mt"].astype(str)
@@ -301,7 +302,8 @@ class RegressionMetric(CometModel):
         Returns:
             List[dict]: List with input samples in the form of a dict
         """
-        df = pd.read_csv(path)
+        # Segments such as "" or "NA" are text, not missing values.
+        df = pd.read_csv(path, keep_default_na=False)
         columns = ["src", "mt", "ref", "score"]
         # If system in columns we will use this to calculate system-level accuracy
         if "system" in df.columns:
