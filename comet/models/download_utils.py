@@ -15,6 +15,7 @@
 
 import logging
 import os
+import shutil
 import subprocess
 import urllib.request
 import zipfile
@@ -196,6 +197,21 @@ def download_file_maybe_extract(
     return filepath
 
 
+def is_legacy_model(model: str, saving_directory: str = None) -> bool:
+    """Whether ``download_model_legacy`` serves ``model``: a legacy model or a
+    folder already in its cache.
+    """
+    if saving_directory is None:
+        saving_directory = get_cache_folder()
+
+    # Same folder lookup as download_model_legacy.
+    saving_directory = str(saving_directory)
+    if not saving_directory.endswith("/"):
+        saving_directory += "/"
+
+    return model in available_legacy_metrics or os.path.isdir(saving_directory + model)
+
+
 def download_model_legacy(model: str, saving_directory: str = None) -> str:
     """
     Function that loads legacy pretrained models from AWS that are not on
@@ -228,9 +244,15 @@ def download_model_legacy(model: str, saving_directory: str = None) -> str:
         )
 
     elif available_legacy_metrics[model].startswith("https://"):
-        download_file_maybe_extract(
-            available_legacy_metrics[model], directory=saving_directory
-        )
+        try:
+            download_file_maybe_extract(
+                available_legacy_metrics[model], directory=saving_directory
+            )
+        except BaseException:
+            # A failed or interrupted extraction leaves a partial model folder,
+            # which later calls would otherwise take for a complete cached model.
+            shutil.rmtree(saving_directory + model, ignore_errors=True)
+            raise
 
     else:
         raise Exception("Invalid model name!")

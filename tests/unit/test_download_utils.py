@@ -8,6 +8,7 @@ import subprocess
 import tarfile
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -57,3 +58,50 @@ class TestDownloadFileMaybeExtract(unittest.TestCase):
             download_utils.download_file_maybe_extract(
                 self.archive.as_uri(), directory=str(self.cache)
             )
+
+
+class TestDownloadModelLegacy(unittest.TestCase):
+    model = "my-model"
+
+    def setUp(self):
+        self.tmpdir = pathlib.Path(tempfile.mkdtemp())
+        self.cache = self.tmpdir / "cache"
+        self.payload = os.urandom(256 * 1024)
+        self.archive = self.tmpdir / "my-model.tar.gz"
+        with tarfile.open(self.archive, "w:gz") as tar:
+            info = tarfile.TarInfo("my-model/checkpoints/model.ckpt")
+            info.size = len(self.payload)
+            tar.addfile(info, io.BytesIO(self.payload))
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir)
+
+    def download(self):
+        """Runs download_model_legacy with the archive served from disk."""
+
+        def urlretrieve(url, filename, reporthook=None):
+            shutil.copyfile(self.archive, filename)
+
+        url = "https://example.invalid/my-model.tar.gz"
+        with mock.patch.dict(
+            download_utils.available_legacy_metrics, {self.model: url}
+        ), mock.patch.object(
+            download_utils.urllib.request, "urlretrieve", urlretrieve
+        ):
+            return download_utils.download_model_legacy(self.model, str(self.cache))
+
+    def test_valid_archive_returns_checkpoint(self):
+        checkpoint = pathlib.Path(self.download())
+        self.assertEqual(checkpoint.name, "model.ckpt")
+        self.assertEqual(checkpoint.read_bytes(), self.payload)
+        self.assertFalse((self.cache / "my-model.tar.gz").exists())
+
+    def test_failed_extraction_is_not_reused_as_cache(self):
+        data = self.archive.read_bytes()
+        self.archive.write_bytes(data[: len(data) // 2])
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.download()
+        # The partially extracted model must not be served by the next call.
+        self.assertFalse((self.cache / self.model).exists())
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.download()

@@ -235,6 +235,19 @@ def mbr_command() -> None:
     with open(cfg.translations(), encoding="utf-8") as fp:
         translations = [line.strip() for line in fp.readlines()]
 
+    # Candidates are grouped --num_samples lines at a time, in order, so any other
+    # line count pairs candidates with the wrong sources.
+    if len(translations) != len(sources) * cfg.num_samples:
+        parser.error(
+            "{} has {} lines but {} sources with --num_samples {} need {}.".format(
+                cfg.translations.rel_path,
+                len(translations),
+                len(sources),
+                cfg.num_samples,
+                len(sources) * cfg.num_samples,
+            )
+        )
+
     num_samples = cfg.num_samples
     # Running QE reranking before MBR!
     if cfg.rerank_top_k > 0:

@@ -269,6 +269,32 @@ class TestMbrCommand(CliTestCase):
         with open(output, encoding="utf-8") as fp:
             self.assertEqual(fp.read(), "AAA\nBB\n")
 
+    def test_translation_count_mismatch_is_rejected(self):
+        src = self.write("src.txt", ["a", "b"])
+        samples = self.write("samples.txt", ["A", "AAA", "BB", "B", "BBB"])
+        output = os.path.join(self.tmpdir, "best.txt")
+        exit_code, _, stderr = self.run_mbr(
+            "-s", src, "-t", samples, "--num_samples", "2", "-o", output, "--gpus", "0"
+        )
+        self.assertNotEqual(exit_code, 0)
+        self.assertEqual(self.loaded_checkpoints, [])
+        self.assertFalse(os.path.exists(output))
+        self.assertIn(
+            "samples.txt has 5 lines but 2 sources with --num_samples 2 need 4", stderr
+        )
+
+    def test_translation_count_is_checked_before_reranking(self):
+        src = self.write("src.txt", ["a", "b"])
+        samples = self.write("samples.txt", ["A", "AA", "AAA", "B", "BB", "BBB"])
+        output = os.path.join(self.tmpdir, "best.txt")
+        self.model.requires_references = lambda: False  # usable as the QE model
+        args = ["-s", src, "-t", samples, "--num_samples", "2", "-o", output]
+        exit_code, _, stderr = self.run_mbr(*args, "--rerank_top_k", "1")
+        self.assertNotEqual(exit_code, 0)
+        # Rejected before the QE model used for reranking is loaded.
+        self.assertEqual(self.loaded_checkpoints, [])
+        self.assertIn("samples.txt has 6 lines", stderr)
+
     def test_model_is_moved_to_gpu_by_default(self):
         src = self.write("src.txt", ["a"])
         samples = self.write("samples.txt", ["A", "AA"])

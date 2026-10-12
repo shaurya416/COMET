@@ -27,7 +27,7 @@ from .multitask.xcomet_metric import XCOMETMetric
 from .ranking.ranking_metric import RankingMetric
 from .regression.referenceless import ReferencelessRegression
 from .regression.regression_metric import RegressionMetric
-from .download_utils import download_model_legacy
+from .download_utils import download_model_legacy, is_legacy_model
 
 
 str2model = {
@@ -48,11 +48,16 @@ def download_model(
         model_path = snapshot_download(
             repo_id=model, cache_dir=saving_directory, local_files_only=local_files_only
         )
-    except Exception:
-        try:
-            checkpoint_path = download_model_legacy(model, saving_directory)
-        except Exception:
-            raise KeyError(f"Model '{model}' not supported by COMET.")
+    except Exception as hub_error:
+        # A gated or private repository, a network failure or a missing local
+        # snapshot is not an unsupported model, so the Hub error is kept.
+        if not is_legacy_model(model, saving_directory):
+            raise KeyError(
+                f"Model '{model}' could not be loaded from the Hugging Face Hub "
+                f"and is not a legacy COMET model: {hub_error}"
+            ) from hub_error
+        # A failed legacy download or extraction is reported as it is.
+        checkpoint_path = download_model_legacy(model, saving_directory)
     else:
         checkpoint_path = os.path.join(*[model_path, "checkpoints", "model.ckpt"])
     return checkpoint_path
